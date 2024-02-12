@@ -1,11 +1,9 @@
 ﻿using Microsoft.Maui.Handlers;
-#if IOS || MACCATALYST
-using PlatformView = Camera.MAUI.Platforms.Apple.MauiCameraView;
-#elif ANDROID
+#if ANDROID
 using PlatformView = Camera.MAUI.Platforms.Android.MauiCameraView;
 #elif WINDOWS
 using PlatformView = Camera.MAUI.Platforms.Windows.MauiCameraView;
-#elif (NETSTANDARD || !PLATFORM) || (NET6_0_OR_GREATER && !IOS && !ANDROID)
+#elif (NETSTANDARD || !PLATFORM) || (NET6_0_OR_GREATER && !ANDROID)
 using PlatformView = System.Object;
 #endif
 
@@ -27,7 +25,7 @@ internal partial class CameraViewHandler : ViewHandler<CameraView, PlatformView>
     }
 #if ANDROID
     protected override PlatformView CreatePlatformView() => new(Context, VirtualView);
-#elif IOS || MACCATALYST || WINDOWS
+#elif WINDOWS
     protected override PlatformView CreatePlatformView() => new(VirtualView);
 #else
     protected override PlatformView CreatePlatformView() => new();
@@ -41,26 +39,26 @@ internal partial class CameraViewHandler : ViewHandler<CameraView, PlatformView>
 
     protected override void DisconnectHandler(PlatformView platformView)
     {
-#if WINDOWS || IOS || MACCATALYST || ANDROID
+#if WINDOWS || ANDROID
         platformView.DisposeControl();
 #endif
         base.DisconnectHandler(platformView);
     }
     public static void MapTorch(CameraViewHandler handler, CameraView cameraView)
     {
-#if WINDOWS || ANDROID || IOS || MACCATALYST
+#if WINDOWS || ANDROID
         handler.PlatformView?.UpdateTorch();
 #endif
     }
     public static void MapMirroredImage(CameraViewHandler handler, CameraView cameraView)
     {
-#if WINDOWS || ANDROID || IOS || MACCATALYST
+#if WINDOWS || ANDROID
         handler.PlatformView?.UpdateMirroredImage();
 #endif
     }
     public static void MapZoomFactor(CameraViewHandler handler, CameraView cameraView)
     {
-#if WINDOWS || ANDROID || IOS || MACCATALYST
+#if WINDOWS || ANDROID
         handler.PlatformView?.SetZoomFactor(cameraView.ZoomFactor);
 #endif
     }
@@ -69,18 +67,8 @@ internal partial class CameraViewHandler : ViewHandler<CameraView, PlatformView>
     {
         if (PlatformView != null)
         {
-#if WINDOWS || ANDROID || IOS || MACCATALYST
+#if WINDOWS || ANDROID
             return PlatformView.StartCameraAsync(PhotosResolution);
-#endif
-        }
-        return Task.Run(() => { return CameraResult.AccessError; });
-    }
-    public Task<CameraResult> StartRecordingAsync(string file, Size Resolution)
-    {
-        if (PlatformView != null)
-        {
-#if WINDOWS || ANDROID || IOS
-            return PlatformView.StartRecordingAsync(file, Resolution);
 #endif
         }
         return Task.Run(() => { return CameraResult.AccessError; });
@@ -91,20 +79,10 @@ internal partial class CameraViewHandler : ViewHandler<CameraView, PlatformView>
         {
 #if WINDOWS
             return PlatformView.StopCameraAsync();
-#elif ANDROID || IOS || MACCATALYST
+#elif ANDROID
             var task = new Task<CameraResult>(() => { return PlatformView.StopCamera(); });
             task.Start();
             return task;
-#endif
-        }
-        return Task.Run(() => { return CameraResult.AccessError; });
-    }
-    public Task<CameraResult> StopRecordingAsync()
-    {
-        if (PlatformView != null)
-        {
-#if WINDOWS || ANDROID || IOS || MACCATALYST
-            return PlatformView.StopRecordingAsync();
 #endif
         }
         return Task.Run(() => { return CameraResult.AccessError; });
@@ -113,23 +91,11 @@ internal partial class CameraViewHandler : ViewHandler<CameraView, PlatformView>
     {
         if (PlatformView != null)
         {
-#if WINDOWS || ANDROID || IOS || MACCATALYST
+#if WINDOWS || ANDROID
             return PlatformView.GetSnapShot(imageFormat);
 #endif
         }
         return null;
-    }
-    public Task<Stream> TakePhotoAsync(ImageFormat imageFormat)
-    {
-        if (PlatformView != null)
-        {
-#if  IOS || MACCATALYST || WINDOWS
-            return PlatformView.TakePhotoAsync(imageFormat);
-#elif ANDROID
-            return Task.Run(() => { return PlatformView.TakePhotoAsync(imageFormat); });
-#endif
-        }
-        return Task.Run(() => { Stream result = null; return result; });
     }
     public Task<bool> SaveSnapShot(ImageFormat imageFormat, string SnapFilePath)
     {
@@ -137,7 +103,7 @@ internal partial class CameraViewHandler : ViewHandler<CameraView, PlatformView>
         {
 #if WINDOWS
             return PlatformView.SaveSnapShot(imageFormat, SnapFilePath);
-#elif ANDROID || IOS || MACCATALYST
+#elif ANDROID
             var task = new Task<bool>(() => { return PlatformView.SaveSnapShot(imageFormat, SnapFilePath); });
             task.Start();
             return task;
@@ -147,13 +113,13 @@ internal partial class CameraViewHandler : ViewHandler<CameraView, PlatformView>
     }
     public void ForceAutoFocus()
     {
-#if ANDROID || WINDOWS || IOS || MACCATALYST
+#if ANDROID || WINDOWS
         PlatformView?.ForceAutoFocus();
 #endif
     }
     public void ForceDispose()
     {
-#if ANDROID || WINDOWS || IOS || MACCATALYST
+#if ANDROID || WINDOWS
         PlatformView?.DisposeControl();
 #endif
     }

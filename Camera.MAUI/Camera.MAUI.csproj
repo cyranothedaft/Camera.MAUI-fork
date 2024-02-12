@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net7.0;net7.0-android;net7.0-ios;net7.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks>net7.0;net7.0-android</TargetFrameworks>
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net7.0-windows10.0.19041.0</TargetFrameworks>
 		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
 		<!-- <TargetFrameworks>$(TargetFrameworks);net7.0-tizen</TargetFrameworks> -->
@@ -17,20 +17,19 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-		<Title>Camera pluging for .NET MAUI Apps</Title>
-		<Description>A Camera View control for .NET MAUI applications.</Description>
+		<Title>Camera and XXX Detector for .NET MAUI Apps</Title>
+		<Description>A Camera View control and a XXX Detector control for .NET MAUI applications.</Description>
 		<Copyright></Copyright>
 		<PackageProjectUrl>https://github.com/hjam40/Camera.MAUI</PackageProjectUrl>
 		<PackageIcon>camera.maui.png</PackageIcon>
-		<PackageReadmeFile>Readme.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/hjam40/Camera.MAUI</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>csharp; dotnet; cross-platform; camera; cameraview; codebar; qr; qr-decoder; codebar-encoder; codebar-decoder; camera-component; camera-view;  plugin; maui; dotnet-maui;</PackageTags>
 		<Authors>hjam40</Authors>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<Version>1.5</Version>
-		<PackageReleaseNotes>Split barcode encoder/decoder in a different package. Fix some bugs
+		<Version>1.4.4</Version>
+		<PackageReleaseNotes>Fix problems with Android rotate device.  Fix iOS problems.
 </PackageReleaseNotes>
 	</PropertyGroup>
 
@@ -39,9 +38,21 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Folder Include="Platforms\iOS\" />
-	  <Folder Include="Platforms\MacCatalyst\" />
-	  <Folder Include="Platforms\Tizen\" />
+	  <Compile Remove="Platforms\iOS\**" />
+	  <Compile Remove="Platforms\MacCatalyst\**" />
+	  <Compile Remove="Platforms\Tizen\**" />
+	  <EmbeddedResource Remove="Platforms\iOS\**" />
+	  <EmbeddedResource Remove="Platforms\MacCatalyst\**" />
+	  <EmbeddedResource Remove="Platforms\Tizen\**" />
+	  <MauiCss Remove="Platforms\iOS\**" />
+	  <MauiCss Remove="Platforms\MacCatalyst\**" />
+	  <MauiCss Remove="Platforms\Tizen\**" />
+	  <MauiXaml Remove="Platforms\iOS\**" />
+	  <MauiXaml Remove="Platforms\MacCatalyst\**" />
+	  <MauiXaml Remove="Platforms\Tizen\**" />
+	  <None Remove="Platforms\iOS\**" />
+	  <None Remove="Platforms\MacCatalyst\**" />
+	  <None Remove="Platforms\Tizen\**" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net7.0-android'">
@@ -53,10 +64,6 @@
 	    <PackagePath>\</PackagePath>
 	  </None>
 	  <None Include="..\.editorconfig" Link=".editorconfig" />
-	  <None Include="..\Readme.md">
-	    <Pack>True</Pack>
-	    <PackagePath>\</PackagePath>
-	  </None>
 	</ItemGroup>
 
 	<ItemGroup>

@@ -16,15 +16,12 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
     private MediaCapture mediaCapture;
     private MediaFrameSource frameSource;
     private MediaFrameReader frameReader;
-    private LowLagMediaRecording mediaRecording;
     private List<MediaFrameSourceGroup> sGroups;
     private bool snapping = false;
     private bool started = false;
     private Microsoft.UI.Xaml.FlowDirection flowDirection = Microsoft.UI.Xaml.FlowDirection.LeftToRight;
     private int frames = 0;
     private bool initiated = false;
-    private bool recording = false;
-    private FileStream recordStream;
     bool mediaLoaded = false;
 
     private readonly CameraView cameraView;
@@ -70,29 +67,6 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
         {
             frameSource.Controller.VideoDeviceController.FocusControl.SetPresetAsync(FocusPreset.Manual).GetAwaiter().GetResult();
             frameSource.Controller.VideoDeviceController.FocusControl.SetPresetAsync(FocusPreset.Auto).GetAwaiter().GetResult();
-        }
-    }
-    internal void UpdateFlashMode()
-    {
-        if (frameSource != null && cameraView != null)
-        {
-            if (frameSource.Controller.VideoDeviceController.FlashControl.Supported)
-            {
-                switch (cameraView.FlashMode)
-                {
-                    case FlashMode.Auto:
-                        frameSource.Controller.VideoDeviceController.FlashControl.Auto = true;
-                        break;
-                    case FlashMode.Enabled:
-                        frameSource.Controller.VideoDeviceController.FlashControl.Auto = false;
-                        frameSource.Controller.VideoDeviceController.FlashControl.Enabled = true;
-                        break;
-                    case FlashMode.Disabled:
-                        frameSource.Controller.VideoDeviceController.FlashControl.Auto = false;
-                        frameSource.Controller.VideoDeviceController.FlashControl.Enabled = false;
-                        break;
-                }
-            }
         }
     }
     internal void UpdateTorch()
@@ -160,11 +134,6 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
                     cameraView.Cameras.Add(camInfo);
                 }
 
-                var aDevices = DeviceInformation.FindAllAsync(DeviceClass.AudioCapture).GetAwaiter().GetResult();
-                cameraView.Microphones.Clear();
-                foreach (var device in aDevices)
-                    cameraView.Microphones.Add(new MicrophoneInfo { Name = device.Name, DeviceId = device.Id });
-
                 initiated = true;
                 cameraView.RefreshDevices();
             }
@@ -172,77 +141,6 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
             {
             }
         }
-    }
-    internal async Task<CameraResult> StartRecordingAsync(string file, Size Resolution)
-    {
-        CameraResult result = CameraResult.Success;
-
-        if (initiated)
-        {
-            if (started) await StopCameraAsync();
-            if (cameraView.Camera != null && cameraView.Microphone != null)
-            {
-                while (!mediaLoaded) await Task.Delay(50);
-                started = true;
-
-                mediaCapture = new MediaCapture();
-                try
-                {
-                    await mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings
-                    {
-                        VideoDeviceId = cameraView.Camera.DeviceId,
-                        MemoryPreference = MediaCaptureMemoryPreference.Cpu,
-                        AudioDeviceId = cameraView.Microphone.DeviceId
-                    });
-
-                    MediaEncodingProfile profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.Auto);
-                    recordStream = new(file, FileMode.Create);
-                    mediaRecording = await mediaCapture.PrepareLowLagRecordToStreamAsync(profile, recordStream.AsRandomAccessStream());
-
-                    frameSource = mediaCapture.FrameSources.FirstOrDefault(source => source.Value.Info.MediaStreamType == MediaStreamType.VideoRecord
-                                                                                  && source.Value.Info.SourceKind == MediaFrameSourceKind.Color).Value;
-                    if (frameSource != null)
-                    {
-                        MediaFrameFormat frameFormat;
-                        if (Resolution.Width <= 0 || Resolution.Height <= 0)
-                            frameFormat = frameSource.SupportedFormats.OrderByDescending(f => f.VideoFormat.Width * f.VideoFormat.Height).FirstOrDefault();
-                        else
-                            frameFormat = frameSource.SupportedFormats.First(f => f.VideoFormat.Width == Resolution.Width && f.VideoFormat.Height == Resolution.Height);
-
-                        if (frameFormat != null)
-                        {
-                            await frameSource.SetFormatAsync(frameFormat);
-                            UpdateTorch();
-                            SetZoomFactor(cameraView.ZoomFactor);
-                            mediaElement.AutoPlay = true;
-                            mediaElement.Source = MediaSource.CreateFromMediaFrameSource(frameSource);
-                            await mediaRecording.StartAsync();
-                            recording = true;
-                        }
-                    }
-                    else
-                        result = CameraResult.NoVideoFormatsAvailable;
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    result = CameraResult.AccessDenied;
-                }
-                catch (Exception)
-                {
-                    result = CameraResult.AccessError;
-                }
-            }
-            else
-                result = cameraView.Camera == null ? CameraResult.NoCameraSelected : CameraResult.NoMicrophoneSelected;
-        }
-        else
-            result = CameraResult.NotInitiated;
-
-        return result;
-    }
-    internal async Task<CameraResult> StopRecordingAsync()
-    {
-        return await StartCameraAsync(cameraView.PhotosResolution);
     }
     internal async Task<CameraResult> StartCameraAsync(Size PhotosResolution)
     {
@@ -336,7 +234,7 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
             result = CameraResult.NotInitiated;
         return result;
     }
-    private void ProcessQRImage(SoftwareBitmap simg)
+    private void ProcessTargetImage(SoftwareBitmap simg)
     {
         if (simg != null)
         {
@@ -346,7 +244,7 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
                 if (img != null)
                 {
                     if (img.PixelWidth > 0 && img.PixelHeight > 0)
-                        cameraView.DecodeBarcode(img);
+                        cameraView.DecodeTargetImage(img);
                     img.Dispose();
                 }
                 lock (cameraView.currentThreadsLocker) cameraView.currentThreads--;
@@ -365,15 +263,15 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
         {
             Task.Run(() => RefreshSnapShot());
         }
-        else if (cameraView.BarCodeDetectionEnabled)
+        else if (cameraView.TargetDetectorEnabled)
         {
             frames++;
-            if (frames >= cameraView.BarCodeDetectionFrameRate)
+            if (frames >= cameraView.TargetDetectorFrameRate)
             {
                 bool processQR = false;
                 lock (cameraView.currentThreadsLocker)
                 {
-                    if (cameraView.currentThreads < cameraView.BarCodeDetectionMaxThreads)
+                    if (cameraView.currentThreads < cameraView.TargetDetectorMaxThreads)
                     {
                         cameraView.currentThreads++;
                         processQR = true;
@@ -382,7 +280,7 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
                 if (processQR)
                 {
                     var frame = sender.TryAcquireLatestFrame();
-                    ProcessQRImage(frame.VideoMediaFrame.SoftwareBitmap);
+                    ProcessTargetImage(frame.VideoMediaFrame.SoftwareBitmap);
                     frames = 0;
                 }
             }
@@ -396,13 +294,6 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
         {
             try
             {
-                if (recording && mediaRecording != null)
-                {
-                    await mediaRecording.StopAsync();
-                    recording = false;
-                    recordStream?.Close();
-                    recordStream?.Dispose();
-                }
                 if (frameReader != null)
                 {
                     await frameReader.StopAsync();
@@ -431,78 +322,6 @@ public sealed partial class MauiCameraView : UserControl, IDisposable
     {
         if (started) StopCameraAsync().Wait();
         Dispose();
-    }
-    internal async Task<Stream> TakePhotoAsync(ImageFormat imageFormat)
-    {
-        /*
-        CameraCaptureUI cameraCaptureUI = new CameraCaptureUI();
-        cameraCaptureUI.PhotoSettings.Format = imageFormat switch
-        {
-            ImageFormat.PNG => CameraCaptureUIPhotoFormat.Png,
-            _=> CameraCaptureUIPhotoFormat.Jpeg
-        };
-        if (cameraView.PhotosResolution.Width != 0 && cameraView.PhotosResolution.Height != 0)
-            cameraCaptureUI.PhotoSettings.CroppedSizeInPixels = new(cameraView.PhotosResolution.Width, cameraView.PhotosResolution.Height);
-        try
-        {
-            var photo = await cameraCaptureUI.CaptureFileAsync(CameraCaptureUIMode.Photo);
-            var rstr = await photo.OpenReadAsync();
-            MemoryStream stream = new();
-            rstr.AsStreamForRead().CopyTo(stream);
-            rstr.Dispose();
-            await photo.DeleteAsync();
-            return stream;
-        }
-        catch { }
-        */
-        if (started && !snapping && frameReader != null)
-        {
-            snapping = true;
-            SoftwareBitmap snapshot = null;
-
-            var frame = frameReader.TryAcquireLatestFrame();
-            if (frame != null && frame.VideoMediaFrame != null)
-            {
-                snapshot = frame.VideoMediaFrame.SoftwareBitmap;
-            }
-            if (snapshot != null)
-            {
-                var iformat = imageFormat switch
-                {
-                    ImageFormat.JPEG => BitmapEncoder.JpegEncoderId,
-                    _ => BitmapEncoder.PngEncoderId
-                };
-                MemoryStream stream = new();
-                BitmapEncoder encoder = await BitmapEncoder.CreateAsync(iformat, stream.AsRandomAccessStream());
-                var img = SoftwareBitmap.Convert(snapshot, BitmapPixelFormat.Rgba8, BitmapAlphaMode.Premultiplied);
-                encoder.SetSoftwareBitmap(img);
-                try
-                {
-                    if (flowDirection == Microsoft.UI.Xaml.FlowDirection.RightToLeft)
-                        encoder.BitmapTransform.Flip = BitmapFlip.Horizontal;
-                    /*
-                    if (cameraView.PhotosResolution.Width != 0 && cameraView.PhotosResolution.Height != 0)
-                    {
-                        encoder.BitmapTransform.ScaledWidth = (uint)cameraView.PhotosResolution.Width;
-                        encoder.BitmapTransform.ScaledHeight = (uint)cameraView.PhotosResolution.Height;
-                    }
-                    */
-                    await encoder.FlushAsync();
-                    stream.Position = 0;
-                    img.Dispose();
-                    snapshot.Dispose();
-                    frame.Dispose();
-                    snapping = false;
-                    return stream;
-                }
-                catch (Exception)
-                {
-                }
-            }
-            snapping = false;
-        }
-        GC.Collect();
-        return null;
     }
     internal ImageSource GetSnapShot(ImageFormat imageFormat, bool auto = false)
     {
